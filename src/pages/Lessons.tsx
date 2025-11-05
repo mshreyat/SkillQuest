@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Lock } from "lucide-react";
 
 // Steps and subsections
 const lessonSteps = [
@@ -10,10 +10,10 @@ const lessonSteps = [
         id: 2,
         title: "Start Learning",
         subsections: [
-            { id: 21, title: "Listening", path: "listening" },
-            { id: 22, title: "Reading", path: "reading" },
-            { id: 23, title: "Writing", path: "writing" },
-            { id: 24, title: "Speaking", path: "speaking" },
+            { id: 21, title: "Listening", path: "listening", dependencies: [] },
+            { id: 22, title: "Reading", path: "reading", dependencies: [] },
+            { id: 23, title: "Writing", path: "writing", dependencies: [] },
+            { id: 24, title: "Speaking", path: "speaking", dependencies: [] },
         ],
     },
     { id: 3, title: "Mock Test", path: "mock-test" },
@@ -31,7 +31,14 @@ const Lessons = () => {
         setCompletedSteps(saved);
     }, [skillName]);
 
-
+    // Check if a subsection is unlocked based on its dependencies
+    const isSubsectionUnlocked = (subsection) => {
+        if (!subsection.dependencies || subsection.dependencies.length === 0) {
+            return true; // No dependencies, always unlocked
+        }
+        // Check if all dependencies are completed
+        return subsection.dependencies.every((depId) => completedSteps.includes(depId));
+    };
 
     const handleStepClick = (step, parentId) => {
         if (!parentId) {
@@ -40,18 +47,10 @@ const Lessons = () => {
                 navigate(`/lessons/${skillName}/${step.path}`);
             }
         } else {
-            // Subsections (Listening → Reading → Writing → Speaking)
-            const parent = lessonSteps.find((s) => s.id === parentId);
-            const subs = parent?.subsections || [];
-            const subIndex = subs.findIndex((s) => s.id === step.id);
-
-            if (subIndex === 0 || completedSteps.includes(subs[subIndex - 1].id)) {
-                navigate(`/lessons/${skillName}/${step.path}`);
-            }
+            // Subsections - now always navigable, but show if locked
+            navigate(`/lessons/${skillName}/${step.path}`);
         }
     };
-
-
 
     const handleCompleteStep = (stepId) => {
         const newCompleted = [...new Set([...completedSteps, stepId])];
@@ -87,23 +86,39 @@ const Lessons = () => {
                                 )}
                             </Button>
 
-
                             {/* Subsection Bubbles */}
                             {step.subsections && isUnlocked && (
                                 <div className="flex flex-wrap justify-center gap-4 mt-4">
                                     {step.subsections.map((sub) => {
                                         const isSubCompleted = completedSteps.includes(sub.id);
+                                        const isSubUnlocked = isSubsectionUnlocked(sub);
+
                                         return (
-                                            <Button
-                                                key={sub.id}
-                                                onClick={() => handleStepClick(sub, step.id)}
-                                                className={`px-4 py-2 rounded-full font-pixel text-sm border-2 border-[hsl(var(--border))] shadow-md transition-transform duration-200 bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:scale-110`}
-                                            >
-                                                {sub.title}
-                                                {isSubCompleted && (
-                                                    <CheckCircle className="ml-1 w-4 h-4 text-[hsl(var(--accent))] animate-pulse" />
+                                            <div key={sub.id} className="relative">
+                                                <Button
+                                                    onClick={() => handleStepClick(sub, step.id)}
+                                                    className={`px-4 py-2 rounded-full font-pixel text-sm border-2 border-[hsl(var(--border))] shadow-md transition-transform duration-200 ${
+                                                        isSubUnlocked
+                                                            ? "bg-[hsl(var(--secondary))] text-[hsl(var(--secondary-foreground))] hover:scale-110"
+                                                            : "bg-gray-600/50 text-gray-400"
+                                                    }`}
+                                                >
+                                                    {sub.title}
+                                                    {isSubCompleted && (
+                                                        <CheckCircle className="ml-1 w-4 h-4 text-[hsl(var(--accent))] animate-pulse" />
+                                                    )}
+                                                    {!isSubUnlocked && !isSubCompleted && (
+                                                        <Lock className="ml-1 w-4 h-4 text-yellow-400" />
+                                                    )}
+                                                </Button>
+                                                
+                                                {/* Tooltip for locked subsections */}
+                                                {!isSubUnlocked && (
+                                                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 hover:opacity-100 transition-opacity pointer-events-none">
+                                                        Complete Listening & Reading first
+                                                    </div>
                                                 )}
-                                            </Button>
+                                            </div>
                                         );
                                     })}
                                 </div>
