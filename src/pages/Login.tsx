@@ -6,25 +6,66 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      toast.success("Welcome back, Adventurer!");
-      navigate("/education");
-    } else {
+    
+    if (!email || !password) {
       toast.error("Please fill in all fields");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const response = await axios.post("http://localhost:5000/api/auth/login", {
+        email,
+        password
+      });
+      
+      // Save token and user to localStorage
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      
+      toast.success(`Welcome back, ${response.data.user.name || 'Adventurer'}!`);
+      navigate("/education");
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || "Login failed";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleSignUp = () => {
-    toast.info("Sign up feature coming soon!");
-    navigate("/education");
+  const handleSignUp = async () => {
+    setIsLoading(true);
+    
+    try {
+      // You can add name field if needed
+      const response = await axios.post("http://localhost:5000/api/auth/register", {
+        email,
+        password,
+        name: email.split('@')[0] // Using email prefix as name for quick signup
+      });
+      
+      localStorage.setItem("token", response.data.token);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      
+      toast.success("Account created successfully!");
+      navigate("/education");
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.error || "Sign up failed";
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -86,6 +127,7 @@ const Login = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="transition-all focus:border-primary"
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
@@ -97,11 +139,18 @@ const Login = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="transition-all focus:border-primary"
+                  disabled={isLoading}
                 />
               </div>
               <div className="space-y-3 pt-2">
-                <Button type="submit" variant="quest" size="lg" className="w-full">
-                  Login
+                <Button 
+                  type="submit" 
+                  variant="quest" 
+                  size="lg" 
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Loading..." : "Login"}
                 </Button>
                 <Button
                   type="button"
@@ -109,6 +158,7 @@ const Login = () => {
                   size="lg"
                   className="w-full"
                   onClick={handleSignUp}
+                  disabled={isLoading}
                 >
                   Sign Up
                 </Button>
