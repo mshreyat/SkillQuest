@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { QuestCard } from "@/components/QuestCard";
 import { GraduationCap, BookOpen, Scroll } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
 
 const Education = () => {
   const navigate = useNavigate();
@@ -26,8 +28,39 @@ const Education = () => {
     },
   ];
 
-  const handleSelect = (level: string) => {
-    navigate(`/skills?level=${level}`);
+  const handleSelect = async (level: string) => {
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      // Update education level in backend
+      await axios.put(
+        "http://localhost:5000/api/user/education-level",
+        { educationLevel: level },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      // Update user in localStorage
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      user.educationLevel = level;
+      localStorage.setItem("user", JSON.stringify(user));
+
+      toast.success(`Education level set to ${level}`);
+      navigate(`/skills?level=${level}`);
+    } catch (error: any) {
+      console.error("Error updating education level:", error);
+      toast.error(error.response?.data?.error || "Failed to update education level");
+    }
   };
 
   return (
@@ -53,10 +86,10 @@ const Education = () => {
           </p>
           <div className="flex items-center justify-center gap-4 pt-2">
             <div className="flex items-center gap-2 px-3 py-2 bg-accent border-2 border-accent">
-              <span className="text-[0.6rem] font-pixel text-card">★ LVL 1</span>
+              <span className="text-[0.6rem] font-pixel text-card">★ LVL {JSON.parse(localStorage.getItem("user") || '{"level":1}').level}</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-2 bg-secondary border-2 border-secondary animate-flicker">
-              <span className="text-[0.6rem] font-pixel text-secondary-foreground">🪙 0 XP</span>
+              <span className="text-[0.6rem] font-pixel text-secondary-foreground">🪙 {JSON.parse(localStorage.getItem("user") || '{"xp":0}').xp} XP</span>
             </div>
           </div>
         </div>

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
 
 const listeningData = [
   {
@@ -45,59 +47,130 @@ const listeningData = [
 const Listening = () => {
   const { skillName } = useParams();
   const navigate = useNavigate();
+  const [userAnswers, setUserAnswers] = useState({});
+  const [feedback, setFeedback] = useState({});
+  const [unlockedSections, setUnlockedSections] = useState([1]);
+
   const handleBack = () => {
     navigate(-1);
   };
 
-  const [userAnswers, setUserAnswers] = useState({});
-  const [feedback, setFeedback] = useState({});
-  const [unlockedSections, setUnlockedSections] = useState([1]); // Section 1 unlocked by default
-
-  const handleChange = (sectionId, questionId, value) => {
+  const handleChange = (sectionId: number, questionId: number, value: string) => {
     const key = `${sectionId}-${questionId}`;
     setUserAnswers({ ...userAnswers, [key]: value });
   };
 
-  const handleSubmit = (sectionId) => {
+  const handleSubmit = async (sectionId: number) => {
     const section = listeningData.find((s) => s.id === sectionId);
     const newFeedback = { ...feedback };
+    const token = localStorage.getItem("token");
 
-    section.questions.forEach((q) => {
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
+    let correctAnswers = 0;
+
+    section?.questions.forEach((q) => {
       const key = `${section.id}-${q.id}`;
-      newFeedback[key] =
-        userAnswers[key]?.trim().toLowerCase() === q.answer.toLowerCase()
-          ? "correct"
-          : "wrong";
+      const isCorrect = userAnswers[key]?.trim().toLowerCase() === q.answer.toLowerCase();
+      newFeedback[key] = isCorrect ? "correct" : "wrong";
+      if (isCorrect) correctAnswers++;
     });
 
     setFeedback(newFeedback);
+
+    // Save answers to backend
+    try {
+      for (const q of section?.questions || []) {
+        const key = `${section.id}-${q.id}`;
+        await axios.post(
+          `http://localhost:5000/api/lessons/${skillName}/save-answer`,
+          {
+            lessonId: `listening-section-${sectionId}`,
+            questionId: `Q${q.id}`,
+            answer: userAnswers[key] || "",
+            isCorrect: newFeedback[key] === "correct",
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+      }
+    } catch (error: any) {
+      console.error("Error saving answers:", error);
+    }
   };
 
-  const handleDone = (sectionId) => {
+  const handleDone = async (sectionId: number) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
     // Unlock next section
     if (sectionId < listeningData.length) {
       setUnlockedSections((prev) => [...new Set([...prev, sectionId + 1])]);
     }
 
-    // If it's the last section → mark listening as completed
-    if (sectionId === listeningData.length) {
-      const completedSteps =
-        JSON.parse(localStorage.getItem(`${skillName}-completed`)) || [];
-      const newCompleted = [...new Set([...completedSteps, 21])]; // Listening ID
-      localStorage.setItem(`${skillName}-completed`, JSON.stringify(newCompleted));
-      navigate(`/lessons/${skillName}`);
+    // Mark section as complete in backend
+    try {
+      const section = listeningData.find((s) => s.id === sectionId);
+      const correctAnswers = section?.questions.filter((q) => {
+        const key = `${sectionId}-${q.id}`;
+        return feedback[key] === "correct";
+      }).length || 0;
+
+      const score = Math.round((correctAnswers / (section?.questions.length || 1)) * 100);
+
+      const response = await axios.post(
+        `http://localhost:5000/api/lessons/${skillName}/complete`,
+        {
+          lessonId: `listening-section-${sectionId}`,
+          lessonType: "quiz",
+          score: score,
+          feedback: `Section ${sectionId} completed`,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update user XP in localStorage
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      user.xp = response.data.totalXp;
+      user.level = response.data.level;
+      localStorage.setItem("user", JSON.stringify(user));
+
+      toast.success(`+${response.data.xpEarned} XP earned!`);
+
+      // If last section, navigate back
+      if (sectionId === listeningData.length) {
+        navigate(`/lessons/${skillName}`);
+      }
+    } catch (error: any) {
+      console.error("Error completing lesson:", error);
+      toast.error("Failed to save progress");
     }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-6 overflow-y-auto">
-       {/* Back Button */}
-            <div>
-                <Button variant="ghost" onClick={handleBack} className="group border-0">
-                    <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
-                    <span className="font-pixel text-[0.65rem]">BACK</span>
-                </Button>
-            </div>
+      <div>
+        <Button variant="ghost" onClick={handleBack} className="group border-0">
+          <ArrowLeft className="mr-2 h-4 w-4 group-hover:-translate-x-1 transition-transform" />
+          <span className="font-pixel text-[0.65rem]">BACK</span>
+        </Button>
+      </div>
       <h1 className="text-3xl font-pixel mb-8 animate-glow text-center">
         🎧 Listening Practice
       </h1>

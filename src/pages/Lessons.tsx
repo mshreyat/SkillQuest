@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
 
-// Steps and subsections
 const lessonSteps = [
     { id: 1, title: "Introduction", path: "introduction" },
     {
@@ -22,25 +23,48 @@ const lessonSteps = [
 const Lessons = () => {
     const { skillName } = useParams();
     const navigate = useNavigate();
-
     const [completedSteps, setCompletedSteps] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Load completed steps from localStorage
     useEffect(() => {
-        const saved = JSON.parse(localStorage.getItem(`${skillName}-completed`)) || [];
-        setCompletedSteps(saved);
+        fetchProgress();
     }, [skillName]);
 
+    const fetchProgress = async () => {
+        const token = localStorage.getItem("token");
+        
+        if (!token) {
+            toast.error("Please login first");
+            navigate("/login");
+            return;
+        }
 
+        try {
+            const response = await axios.get(
+                `http://localhost:5000/api/lessons/${skillName}/progress`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+            
+            setCompletedSteps(response.data.completedSteps || []);
+        } catch (error: any) {
+            console.error("Error fetching progress:", error);
+            // If no progress exists, start with empty array
+            setCompletedSteps([]);
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
-    const handleStepClick = (step, parentId) => {
+    const handleStepClick = (step: any, parentId: any) => {
         if (!parentId) {
-            // Main steps (Intro, Start Learning, Mock Test)
             if (step.id === 1 || completedSteps.includes(step.id - 1)) {
                 navigate(`/lessons/${skillName}/${step.path}`);
             }
         } else {
-            // Subsections (Listening → Reading → Writing → Speaking)
             const parent = lessonSteps.find((s) => s.id === parentId);
             const subs = parent?.subsections || [];
             const subIndex = subs.findIndex((s) => s.id === step.id);
@@ -51,13 +75,13 @@ const Lessons = () => {
         }
     };
 
-
-
-    const handleCompleteStep = (stepId) => {
-        const newCompleted = [...new Set([...completedSteps, stepId])];
-        setCompletedSteps(newCompleted);
-        localStorage.setItem(`${skillName}-completed`, JSON.stringify(newCompleted));
-    };
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-[hsl(var(--background))]">
+                <p className="font-pixel text-primary animate-glow">LOADING LESSONS...</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex flex-col items-center bg-[hsl(var(--background))] text-[hsl(var(--foreground))] p-6">
@@ -72,7 +96,6 @@ const Lessons = () => {
 
                     return (
                         <div key={step.id} className="relative flex flex-col items-center w-full">
-                            {/* Main Bubble */}
                             <Button
                                 onClick={() => (step.subsections ? null : handleStepClick(step, null))}
                                 disabled={!isUnlocked}
@@ -87,8 +110,6 @@ const Lessons = () => {
                                 )}
                             </Button>
 
-
-                            {/* Subsection Bubbles */}
                             {step.subsections && isUnlocked && (
                                 <div className="flex flex-wrap justify-center gap-4 mt-4">
                                     {step.subsections.map((sub) => {

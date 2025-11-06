@@ -1,30 +1,73 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { ArrowLeft, Trophy, PlayCircle } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
 
 const SkillSelected = () => {
   const navigate = useNavigate();
   const { skillName } = useParams();
+  const [skillProgress, setSkillProgress] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const formattedSkillName = skillName
     ?.split("-")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ") || "Unknown Skill";
 
+  useEffect(() => {
+    fetchSkillProgress();
+  }, [skillName]);
+
+  const fetchSkillProgress = async () => {
+    const token = localStorage.getItem("token");
+    
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/skills/${skillName}/progress`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setSkillProgress(response.data);
+    } catch (error: any) {
+      console.error("Error fetching progress:", error);
+      toast.error("Failed to load progress");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleBack = () => {
     navigate(-1);
   };
 
   const handleContinue = () => {
-    // Future expansion - go to actual quest content
     console.log("Continue quest clicked");
   };
 
   const handleLessonsClick = () => {
     navigate(`/lessons/${skillName}`);
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-quest flex items-center justify-center">
+        <p className="font-pixel text-primary animate-glow">LOADING...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-quest p-8 relative overflow-hidden">
@@ -56,20 +99,24 @@ const SkillSelected = () => {
           {/* Header */}
           <div className="text-center space-y-6">
             <div className="inline-block px-4 py-2 bg-accent border-2 border-accent mb-2 animate-pixel-bounce">
-              <span className="text-[0.6rem] font-pixel text-card">🎊 UNLOCKED!</span>
+              <span className="text-[0.6rem] font-pixel text-card">
+                {skillProgress?.started ? "🎊 CONTINUE!" : "🎊 UNLOCKED!"}
+              </span>
             </div>
             <h1 className="text-3xl font-pixel text-primary animate-glow leading-relaxed">
-              {formattedSkillName.toUpperCase()} STARTED!
+              {formattedSkillName.toUpperCase()} {skillProgress?.started ? "IN PROGRESS" : "STARTED"}!
             </h1>
             <p className="text-xs text-muted-foreground font-pixel leading-relaxed">
-              JOURNEY BEGUN IN{" "}
+              JOURNEY {skillProgress?.started ? "CONTINUES" : "BEGUN"} IN{" "}
               <span className="px-3 py-2 bg-primary border-2 border-primary font-pixel text-primary-foreground inline-block text-[0.6rem]">
                 {formattedSkillName.toUpperCase()}
               </span>
             </p>
             <div className="flex items-center justify-center gap-3 pt-4">
               <div className="px-4 py-2 bg-secondary border-2 border-secondary animate-flicker">
-                <span className="text-[0.6rem] font-pixel text-secondary-foreground">+50 XP</span>
+                <span className="text-[0.6rem] font-pixel text-secondary-foreground">
+                  {skillProgress?.started ? `${skillProgress.progress}% Complete` : "+50 XP"}
+                </span>
               </div>
             </div>
           </div>
@@ -88,21 +135,25 @@ const SkillSelected = () => {
                   🎯 PROGRESS
                 </span>
                 <span className="text-muted-foreground flex items-center gap-2">
-                  <span className="px-3 py-2 bg-muted border-2 border-border text-[0.6rem] font-pixel">0%</span>
+                  <span className="px-3 py-2 bg-muted border-2 border-border text-[0.6rem] font-pixel">
+                    {skillProgress?.progress || 0}%
+                  </span>
                 </span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6 relative">
               <div className="relative border-4 border-border bg-muted p-2">
-                <Progress value={0} className="h-8 border-2 border-border" />
+                <Progress value={skillProgress?.progress || 0} className="h-8 border-2 border-border" />
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-[0.6rem] font-pixel text-primary animate-flicker">START ADVENTURE</span>
+                  <span className="text-[0.6rem] font-pixel text-primary animate-flicker">
+                    {skillProgress?.started ? "CONTINUE ADVENTURE" : "START ADVENTURE"}
+                  </span>
                 </div>
               </div>
 
               <div className="bg-muted p-6 space-y-4 border-4 border-border">
                 <h3 className="font-pixel text-xs flex items-center gap-2 text-primary">
-                  <span>🗺️</span> JOURNEY START
+                  <span>🗺️</span> JOURNEY {skillProgress?.started ? "CONTINUES" : "START"}
                 </h3>
                 <p className="text-muted-foreground text-[0.65rem] font-pixel leading-relaxed">
                   COMPLETE CHALLENGES, EARN REWARDS, MASTER SKILLS!

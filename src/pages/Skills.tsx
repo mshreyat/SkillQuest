@@ -1,48 +1,90 @@
+import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { QuestCard } from "@/components/QuestCard";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, MessageCircle, TrendingUp, Code, FileSpreadsheet, Palette } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
 
 const Skills = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const level = searchParams.get("level") || "unknown";
+  const [skills, setSkills] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const skills = [
-    {
-      id: "ielts",
-      title: "IELTS Prep",
-      icon: MessageCircle,
-    },
-    {
-      id: "sat",
-      title: "SAT Prep",
-      icon: TrendingUp,
-    },
-    {
-      id: "python",
-      title: "Python Micro Course",
-      icon: Code,
-    },
-    {
-      id: "excel",
-      title: "Excel Mastery",
-      icon: FileSpreadsheet,
-    },
-    {
-      id: "canva",
-      title: "Canva Design",
-      icon: Palette,
-    },
-  ];
+  const skillIcons: any = {
+    ielts: MessageCircle,
+    sat: TrendingUp,
+    python: Code,
+    excel: FileSpreadsheet,
+    canva: Palette,
+  };
 
-  const handleSkillSelect = (skillId: string) => {
-    navigate(`/skills/${skillId}/start`);
+  useEffect(() => {
+    fetchSkills();
+  }, [level]);
+
+  const fetchSkills = async () => {
+    setIsLoading(true);
+    try {
+      const response = await axios.get(
+        `http://localhost:5000/api/skills?educationLevel=${level}`
+      );
+      setSkills(response.data.skills);
+    } catch (error: any) {
+      console.error("Error fetching skills:", error);
+      toast.error("Failed to load skills");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSkillSelect = async (skillId: string) => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      toast.error("Please login first");
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const response = await axios.post(
+        `http://localhost:5000/api/skills/${skillId}/start`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Update user XP and level in localStorage
+      const user = JSON.parse(localStorage.getItem("user") || "{}");
+      user.xp = response.data.xp;
+      user.level = response.data.level;
+      localStorage.setItem("user", JSON.stringify(user));
+
+      toast.success(`${response.data.skill.skillName} started! +50 XP`);
+      navigate(`/skills/${skillId}/start`);
+    } catch (error: any) {
+      console.error("Error starting skill:", error);
+      toast.error(error.response?.data?.error || "Failed to start skill");
+    }
   };
 
   const handleBack = () => {
     navigate("/education");
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-quest flex items-center justify-center">
+        <p className="font-pixel text-primary animate-glow">LOADING QUESTS...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-quest p-8 relative overflow-hidden">
@@ -88,12 +130,12 @@ const Skills = () => {
 
         {/* Skills Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {skills.map((skill) => (
-            <div key={skill.id} className="transform hover:scale-105 transition-all duration-300">
+          {skills.map((skill: any) => (
+            <div key={skill.skillId} className="transform hover:scale-105 transition-all duration-300">
               <QuestCard
                 title={skill.title}
-                icon={skill.icon}
-                onClick={() => handleSkillSelect(skill.id)}
+                icon={skillIcons[skill.skillId] || Code}
+                onClick={() => handleSkillSelect(skill.skillId)}
               />
             </div>
           ))}
