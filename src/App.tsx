@@ -1,5 +1,5 @@
 import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "@/components/ui/sonner"; // Issue 1 & 2: Renamed
+import { Toaster as SonnerToaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
@@ -12,6 +12,8 @@ import Lessons from "./pages/Lessons";
 import Introduction from "./pages/Introduction";
 import Listening from "./pages/Listening";
 import Reading from "./pages/Reading";
+import Writing from "./pages/Writing";
+import Speaking from "./pages/Speaking";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +21,7 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <SonnerToaster /> {/* Issue 3 & 4: Used the unique component name */}
+      <SonnerToaster />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Login />} />
@@ -32,9 +34,8 @@ const App = () => (
           <Route path="/lessons/:skillName/introduction" element={<Introduction />} />
           <Route path="/lessons/:skillName/listening" element={<Listening />} />
           <Route path="/lessons/:skillName/reading" element={<Reading />} />
-
-
-
+          <Route path="/lessons/:skillName/writing" element={<Writing />} />
+          <Route path="/lessons/:skillName/speaking" element={<Speaking />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
